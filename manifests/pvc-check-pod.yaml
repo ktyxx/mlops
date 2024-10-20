@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pvc-check-pod
+  namespace: job-ns  
+spec:
+  containers:
+  - name: pvc-check-container
+    image: busybox
+    command: ["sh", "-c", "sleep 3600"] 
+    volumeMounts:
+    - name: model-storage
+      mountPath: /mnt/data  
+  volumes:
+  - name: model-storage
+    persistentVolumeClaim:
+      claimName: mnist-pvc  
+  restartPolicy: Never  

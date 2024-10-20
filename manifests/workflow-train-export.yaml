@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: train-export-workflow
+  namespace: job-ns
+spec:
+  entrypoint: train-export-workflow  
+  volumes:
+    - name: mnist-data
+      persistentVolumeClaim:
+        claimName: mnist-pvc
+
+  templates:
+  - name: train-export-workflow
+    steps:
+    - - name: train-job
+        template: train-job
+    - - name: export-job
+        template: export-job
+
+  - name: train-job
+    container:
+      image: localhost:5000/tr-ex-job:v1.25
+      command: ["python", "/app/train.py"]
+      volumeMounts:
+        - name: mnist-data
+          mountPath: /mnt/data
+
+  - name: export-job
+    container:
+      image: localhost:5000/tr-ex-job:v1.25
+      command: ["python", "/app/export.py"]
+      volumeMounts:
+        - name: mnist-data
+          mountPath: /mnt/data

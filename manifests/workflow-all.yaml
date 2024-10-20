@@ -1,0 +1,120 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: train-export-client-workflow
+  namespace: job-ns
+spec:
+  entrypoint: train-export-client-workflow  
+  volumes:
+    - name: mnist-data
+      persistentVolumeClaim:
+        claimName: mnist-pvc
+
+  templates:
+  - name: train-export-client-workflow
+    steps:
+    - - name: train-job
+        template: train-job
+    - - name: export-job
+        template: export-job
+    - - name: triton-server-deploy
+        template: deploy-triton-server
+    - - name: triton-service-deploy
+        template: deploy-triton-service            
+    - - name: deploy-client-pod
+        template: deploy-client-pod
+
+  - name: train-job
+    container:
+      image: localhost:5000/tr-ex-job:v1.23
+      command: ["python", "/app/train.py"]
+      volumeMounts:
+        - name: mnist-data
+          mountPath: /mnt/data
+
+  - name: export-job
+    container:
+      image: localhost:5000/tr-ex-job:v1.23
+      command: ["python", "/app/export.py"]
+      volumeMounts:
+        - name: mnist-data
+          mountPath: /mnt/data
+
+  - name: deploy-triton-server
+    resource:
+      action: create
+      manifest: |
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: triton-server
+          namespace: job-ns
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: triton-server
+          template:
+            metadata:
+              labels:
+                app: triton-server
+            spec:
+              containers:
+              - name: triton-server
+                image: nvcr.io/nvidia/tritonserver:21.02-py3
+                args: ["tritonserver", "--model-repository=/mnt/data/triton-models"]
+                volumeMounts:
+                - name: model-storage
+                  mountPath: /mnt/data
+              volumes:
+              - name: model-storage
+                persistentVolumeClaim:
+                  claimName: mnist-pvc
+
+  - name: deploy-triton-service
+    resource:
+      action: create
+      manifest: |
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: triton-service
+          namespace: job-ns  
+        spec:
+          selector:
+            app: triton-server 
+          ports:
+            - port: 8000
+              targetPort: 8000
+              name: http-inference-server 
+            - port: 8001
+              targetPort: 8001
+              name: grpc-inference-server  
+          type: ClusterIP   
+  
+  - name: deploy-client-pod
+    resource:
+      action: create
+      manifest: |
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: client-pod
+          namespace: job-ns  
+        spec:
+          containers:
+          - name: client-container
+            image: localhost:5000/client-job:v1.5  
+            env:
+            - name: TRITON_SERVER_URL
+              value: "triton-service:8001"  
+            volumeMounts:
+            - name: client-logs
+              mountPath: /mnt/logs  
+            command: ["python", "/app/client.py"]  
+          volumes:
+          - name: client-logs
+            persistentVolumeClaim:
+              claimName: logs-pvc  
+          restartPolicy: Never  
+

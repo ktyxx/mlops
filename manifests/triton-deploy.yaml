@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: triton-server
+  namespace: job-ns  
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: triton-server
+  template:
+    metadata:
+      labels:
+        app: triton-server
+    spec:
+      containers:
+      - name: triton-server
+        image: nvcr.io/nvidia/tritonserver:21.02-py3
+        args: ["tritonserver", "--model-repository=/mnt/data/triton-models"]  
+        volumeMounts:
+        - name: model-storage
+          mountPath: /mnt/data
+      volumes:
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: mnist-pvc  
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: triton-service
+  namespace: job-ns  
+spec:
+  selector:
+    app: triton-server 
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http-inference-server 
+    - port: 8001
+      targetPort: 8001
+      name: grpc-inference-server  
+  type: ClusterIP           

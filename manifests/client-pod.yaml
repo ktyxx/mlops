@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: client-pod
+  namespace: job-ns  
+spec:
+  containers:
+  - name: client-container
+    image: localhost:5000/client-job:v1.5  
+    env:
+    - name: TRITON_SERVER_URL
+      value: "triton-service:8001"  
+    volumeMounts:
+    - name: client-logs
+      mountPath: /mnt/logs  
+    command: ["python", "/app/client.py"]  
+  volumes:
+  - name: client-logs
+    persistentVolumeClaim:
+      claimName: logs-pvc  
+  restartPolicy: Never  

@@ -1,0 +1,9 @@
+FROM python:3.8
+
+RUN pip install tritonclient[grpc]
+
+WORKDIR /app
+
+COPY scripts/client.py /app/client.py
+
+CMD ["python", "client.py"]
