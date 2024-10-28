@@ -1,4 +1,4 @@
-# Pyler-mlops
+# mlops
 
 # 프로젝트 소개
 
